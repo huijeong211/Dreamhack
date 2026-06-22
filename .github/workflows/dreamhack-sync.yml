@@ -1,0 +1,49 @@
+name: Dreamhack Sync
+
+on:
+  schedule:
+    # 매일 자정(한국 시간 오전 9시)에 자동으로 드림핵 기록을 갱신합니다.
+    - cron: '0 0 * * *'
+  workflow_dispatch: # 수동으로도 실행할 수 있게 합니다.
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install Dependencies
+        run: |
+          pip install requests beautifulsoup4
+
+      - name: Fetch Dreamhack Data
+        env:
+          DREAMHACK_UID: '96625'
+        run: |
+          python -c "
+          import requests
+          from bs4 import BeautifulSoup
+          import os
+          import datetime
+
+          uid = os.environ['DREAMHACK_UID']
+          res = requests.get(f'https://dreamhack.io/user/{uid}')
+          if res.status_code == 200:
+              soup = BeautifulSoup(res.text, 'html.parser')
+              now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+              with open('dreamhack_status.txt', 'w', encoding='utf-8') as f:
+                  f.write(f'Last Checked: {now}\nDreamhack User: {uid}\n')
+          "
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add dreamhack_status.txt
+          git diff --quiet && git diff --cached --quiet || (git commit -m "🔥 Sync Dreamhack Activities" && git push)
